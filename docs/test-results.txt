@@ -1,0 +1,61 @@
+PASS Energy balance: battery change = generation - demand
+PASS Night + empty battery causes brownout
+PASS Greenhouse harvests after 8 sols
+PASS Water failure stops recycling
+PASS Outside gives more radiation than shelter
+PASS Shields reduce storm dose
+PASS Fail when oxygen depleted
+PASS Mission ends at sol 20
+PASS Lunar night sunlight is 10%
+PASS Medical bay heals crew
+PASS Seeded PRNG produces deterministic values
+PASS i18n returns English strings
+PASS i18n Tamil fallback works
+PASS NASA videos array populated
+PASS Quiz questions available
+PASS Random events defined
+PASS Buildings include medbay
+PASS Academy screen renders: welcome
+PASS Academy screen renders: create
+PASS Academy screen renders: hub
+PASS Academy screen renders: zero
+PASS Academy screen renders: rover
+PASS Academy screen renders: rocket
+PASS Academy screen renders: planets
+PASS Academy screen renders: survive
+PASS Academy screen renders: nav
+PASS Academy screen renders: radio
+PASS Academy screen renders: cert
+PASS Academy screen renders: parents
+PASS Academy screen renders: outpost
+PASS Academy screen renders: watch
+PASS Academy screen renders: gallery
+PASS Academy screen renders: nasa
+PASS 3D falls back safely when WebGL/Three.js is unavailable
+PASS Overview renders for a running mission (preview keeps working)
+PASS Full moon mission plays to an end
+PASS Full mars mission plays to an end
+PASS VIDEOS entries have valid 11-character YouTube IDs and titles
+
+Frontend: 38/38 passed
+PASS health endpoint works and does not leak keys
+PASS CORS origin follows CORS_ORIGIN
+PASS APOD proxy returns simplified data
+PASS NASA key is sent upstream only, never returned to the browser
+PASS DONKI flares are simplified, newest first
+PASS Mars photos upgraded to https and unsafe URLs dropped
+PASS progress rejects invalid player id
+PASS progress ignores unknown missions and caps XP to what was earned
+PASS leaderboard is sorted and names are sanitised
+PASS saved progress can be loaded back
+PASS Cosmo AI proxy works, strips markdown, key sent in header only
+PASS Cosmo prompt includes language, game state and child-safety system prompt
+PASS Cosmo falls back cleanly when no AI key is configured
+PASS Cosmo rejects an empty question
+PASS oversized request bodies are rejected
+PASS malformed JSON is rejected
+PASS static server blocks path traversal to .env
+PASS unknown API routes return 404
+PASS Cosmo is rate limited (10 per minute per client)
+
+Backend: 19/19 passed

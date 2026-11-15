@@ -1,0 +1,19 @@
+{
+  "name": "spacebuddy-electrons07",
+  "version": "2.1.0",
+  "description": "SPACEBUDDY – Junior Astronaut Mission Trainer | NASA Space Apps 2026 | Team ELECTRONS_07",
+  "type": "module",
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite",
+    "server": "node backend/server.js",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node backend/server.js",
+    "test": "node tests/run-tests.cjs && node tests/api-tests.cjs",
+    "verify-videos": "node scripts/verify-videos.mjs"
+  },
+  "devDependencies": { "vite": "^5.4.0" },
+  "license": "MIT"
+}
