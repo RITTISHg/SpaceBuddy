@@ -178,9 +178,22 @@ export async function handleRequest(req, res) {
       }
     }
     if (route === 'GET /api/gallery') {
+      const mf = path.join(ROOT, 'public', 'gallery', 'manifest.json');
+      if (fs.existsSync(mf)) {
+        try { return send(res, 200, JSON.parse(fs.readFileSync(mf, 'utf8'))); } catch {}
+      }
       const dir = path.join(ROOT, 'public', 'gallery');
-      const files = fs.existsSync(dir) ? fs.readdirSync(dir).filter(n => /\.(jpe?g|png|webp|gif|avif)$/i.test(n)).sort() : [];
-      return send(res, 200, files);
+      const files = [];
+      const scan = (d, rel = '') => {
+        if (!fs.existsSync(d)) return;
+        for (const f of fs.readdirSync(d)) {
+          const full = path.join(d, f), sub = rel ? rel + '/' + f : f;
+          if (fs.statSync(full).isDirectory()) scan(full, sub);
+          else if (/\.(jpe?g|png|webp|gif|avif)$/i.test(f)) files.push(sub);
+        }
+      };
+      scan(dir);
+      return send(res, 200, files.sort());
     }
 
     if (route === 'POST /api/progress') {

@@ -929,7 +929,7 @@ function opGame(){sayO('o','Mine ice, regolith and metal, then build your outpos
 
 let GAL=[],GI=0;
 async function galLoad(){sayO('gal','Your photo gallery!');const e=$('gal');if(!e)return;let l=[];try{l=await api('/api/gallery')}catch(_){try{l=await (await fetch('/gallery/manifest.json')).json()}catch(_){}}
- GAL=(l||[]).map(n=>'/gallery/'+encodeURIComponent(n));
+ GAL=(l||[]).map(n=>'/gallery/'+String(n).split('/').map(encodeURIComponent).join('/'));
  e.innerHTML=GAL.length?`<div class="card"><h2>📸 Photo Gallery</h2><p class="mu">${GAL.length} photos · tap one to zoom, use ◀ ▶ keys to browse</p></div><div class="galg">${GAL.map((u,i)=>`<figure class="galf" style="animation-delay:${Math.min(i,24)*70}ms" onclick="galOpen(${i})"><img src="${u}" loading="lazy" alt="Gallery photo ${i+1}"></figure>`).join('')}</div>`:`<div class="card"><h2>📸 Photo Gallery</h2><p class="mu">Add your photos to the <b>public/gallery</b> folder and refresh this page. They will appear here with animation.</p></div>`}
 function galOpen(i){GI=(i+GAL.length)%GAL.length;let o=$('galb');if(!o){o=document.createElement('div');o.id='galb';o.className='galb';o.onclick=e=>{if(e.target===o)galClose()};document.body.appendChild(o)}o.innerHTML=`<button class="galx" onclick="galClose()">✕</button><button class="galn" style="left:12px" onclick="galOpen(GI-1)">◀</button><img src="${GAL[GI]}" class="galz" alt="Gallery photo ${GI+1}"><button class="galn" style="right:12px" onclick="galOpen(GI+1)">▶</button>`}
 function galClose(){const o=$('galb');if(o)o.remove()}
