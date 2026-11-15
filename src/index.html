@@ -422,12 +422,50 @@ async function api(path,opt){const c=new AbortController(),tm=setTimeout(()=>c.a
 function pid(){if(!P.pid){P.pid=(window.crypto&&crypto.randomUUID)?crypto.randomUUID():('p'+Date.now()+Math.random().toString(16).slice(2));save()}return P.pid}
 function sync(){api('/api/progress',{method:'POST',body:JSON.stringify({id:pid(),name:P.name,xp:P.xp,done:Object.keys(P.done)})}).catch(()=>{})}
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const httpsUrl=u=>(typeof u==='string'&&/^https:\/\//i.test(u))?u:(typeof u==='string'&&/^http:\/\//i.test(u))?u.replace(/^http:/i,'https:'):'';
+async function fetchApodDirect(){
+ try{
+  const r=await fetch('https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY',{signal:AbortSignal.timeout(3500)});
+  if(!r.ok)throw 0;
+  const a=await r.json();
+  if(!a||!a.title)throw 0;
+  return{title:String(a.title||'').slice(0,200),date:String(a.date||''),media:a.media_type==='image'?'image':'other',url:httpsUrl(String(a.url||'')),credit:'NASA APOD'};
+ }catch(_){
+  const r=await fetch('https://images-api.nasa.gov/search?media_type=image&q=astronomy%20nebula%20galaxy',{signal:AbortSignal.timeout(6000)});
+  const j=await r.json(),items=((j&&j.collection&&j.collection.items)||[]).filter(i=>i.links&&i.links[0]&&i.data&&i.data[0]);
+  const it=items[Math.floor(Date.now()/864e5)%Math.max(1,items.length)];
+  return{title:String(it.data[0].title||'').slice(0,200),date:String(it.data[0].date_created||'').slice(0,10),media:'image',url:httpsUrl(String(it.links[0].href||'')),credit:'NASA Image Library'};
+ }
+}
+async function fetchFlaresDirect(){
+ try{
+  const r=await fetch('https://services.swpc.noaa.gov/json/goes/primary/xray-flares-7-day.json',{signal:AbortSignal.timeout(6000)});
+  if(!r.ok)throw 0;
+  const list=await r.json();
+  const flares=(Array.isArray(list)?list:[]).filter(x=>x.max_class).slice(-5).reverse().map(x=>({time:String(x.max_time||x.begin_time||''),cls:String(x.max_class||'?').slice(0,6)}));
+  return{flares,credit:'NOAA Space Weather'};
+ }catch(_){
+  return{flares:[],credit:'NOAA Space Weather'};
+ }
+}
+async function fetchMarsDirect(){
+ try{
+  const r=await fetch('https://images-api.nasa.gov/search?media_type=image&q=curiosity%20rover%20mars%20surface',{signal:AbortSignal.timeout(6000)});
+  if(!r.ok)throw 0;
+  const j=await r.json(),items=((j&&j.collection&&j.collection.items)||[]).filter(i=>i.links&&i.links[0]&&i.data&&i.data[0]);
+  const off=Math.floor(Date.now()/864e5)%Math.max(1,Math.max(1,items.length-4));
+  const photos=items.slice(off,off+4).map(i=>({img:httpsUrl(String(i.links[0].href||'')),camera:String(i.data[0].title||'Curiosity').slice(0,60),date:String(i.data[0].date_created||'').slice(0,10)}));
+  return{rover:'Curiosity',photos,credit:'NASA Image Library'};
+ }catch(_){
+  return{rover:'Curiosity',photos:[],credit:'NASA Image Library'};
+ }
+}
 function lead(){api('/api/leaderboard').then(r=>{const e=$('lb');if(!e)return;e.innerHTML=r.top.length?'<b>🏆 Top astronauts</b> '+r.top.slice(0,5).map((x,i)=>`${i+1}. ${esc(x.name)} (${x.xp} XP)`).join(' · '):'<span class="mu">Be the first on the leaderboard!</span>'}).catch(()=>{const e=$('lb');if(e)e.style.display='none'})}
 async function nasaLive(){sayO('nasa','Here is real data from NASA!');
- const set=(id,h)=>{const e=$(id);if(e)e.innerHTML=h},off=n=>`<h3>${n}</h3><p class="mu">Live data is not available right now (you may be offline or the server is not running). Try again later!</p>`;
- api('/api/nasa/apod',{t:15000}).then(a=>set('apod',`<h3>📷 Astronomy Picture of the Day</h3><b>${esc(a.title)}</b>${a.media==='image'&&a.url?`<img src="${esc(a.url)}" alt="${esc(a.title)}" loading="lazy" style="width:100%;border-radius:12px;margin-top:6px">`:'<p>Today’s picture is a video or interactive page.</p>'}<small class="mu">${esc(a.date)} · NASA APOD</small>`)).catch(()=>set('apod',off('📷 Astronomy Picture of the Day')));
- api('/api/nasa/donki',{t:15000}).then(f=>set('flares',`<h3>☀️ Recent solar flares</h3>${f.flares.length?'<table>'+f.flares.map(x=>`<tr><td>${esc(x.time.slice(0,10))}</td><td>Class ${esc(x.cls)}</td></tr>`).join('')+'</table>':'<p>No flares reported in the last 30 days.</p>'}<small class="mu">Stronger classes are X, then M, then C. In the game, solar storms raise radiation! · NASA DONKI</small>`)).catch(()=>set('flares',off('☀️ Recent solar flares')));
- api('/api/nasa/mars',{t:15000}).then(m=>set('mars',`<h3>🔴 Fresh photos from ${esc(m.rover)}</h3>${m.photos.length?m.photos.map(p=>`<img src="${esc(p.img)}" alt="Mars photo from ${esc(p.camera)}, ${esc(p.date)}" loading="lazy" style="width:48%;border-radius:10px;margin:2px">`).join(''):'<p>No new photos right now.</p>'}<small class="mu">NASA Mars Rover Photos</small>`)).catch(()=>set('mars',off('🔴 Mars rover photos')))}
+ const set=(id,h)=>{const e=$(id);if(e)e.innerHTML=h},off=n=>`<h3>${n}</h3><p class="mu">Live data is not available right now. Try again later!</p>`;
+ api('/api/nasa/apod',{t:8000}).catch(()=>fetchApodDirect()).then(a=>set('apod',`<h3>📷 Astronomy Picture of the Day</h3><b>${esc(a.title)}</b>${a.media==='image'&&a.url?`<img src="${esc(a.url)}" alt="${esc(a.title)}" loading="lazy" style="width:100%;border-radius:12px;margin-top:6px">`:'<p>Today’s picture is a video or interactive page.</p>'}<small class="mu">${esc(a.date)} · ${esc(a.credit||'NASA APOD')}</small>`)).catch(()=>set('apod',off('📷 Astronomy Picture of the Day')));
+ api('/api/nasa/donki',{t:8000}).catch(()=>fetchFlaresDirect()).then(f=>set('flares',`<h3>☀️ Recent solar flares</h3>${f.flares&&f.flares.length?'<table>'+f.flares.map(x=>`<tr><td>${esc((x.time||'').slice(0,10))}</td><td>Class ${esc(x.cls)}</td></tr>`).join('')+'</table>':'<p>No flares reported in the last 30 days.</p>'}<small class="mu">Stronger classes are X, then M, then C. In the game, solar storms raise radiation! · ${esc(f.credit||'NASA DONKI')}</small>`)).catch(()=>set('flares',off('☀️ Recent solar flares')));
+ api('/api/nasa/mars',{t:8000}).catch(()=>fetchMarsDirect()).then(m=>set('mars',`<h3>🔴 Fresh photos from ${esc(m.rover||'Curiosity')}</h3>${m.photos&&m.photos.length?m.photos.map(p=>`<img src="${esc(p.img)}" alt="Mars photo from ${esc(p.camera)}, ${esc(p.date)}" loading="lazy" style="width:48%;border-radius:10px;margin:2px">`).join(''):'<p>No new photos right now.</p>'}<small class="mu">${esc(m.credit||'NASA Mars Rover Photos')}</small>`)).catch(()=>set('mars',off('🔴 Mars rover photos')))}
 function award(id,ok){if(ok&&!P.done[id]){P.done[id]=1;const b=id===DAILY()&&P.dd!==TODAY?50:0;if(b)P.dd=TODAY;P.xp+=100+b;save();sync();confetti();sfxOk();say('Mission complete! You earned a star and '+(100+b)+' XP!')}}
 
 /* Cosmo AI – 40+ keyword-matched topics */
@@ -533,7 +571,7 @@ function tex3(a,b,i){const c=document.createElement('canvas');c.width=256;c.heig
 function scene3(box,c0){const W=box.clientWidth||320,H=box.clientHeight||300,sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,W/H,.1,100),rd=new THREE.WebGLRenderer({antialias:true,alpha:true});rd.setSize(W,H);rd.setPixelRatio(Math.min(devicePixelRatio||1,2));box.innerHTML='';box.appendChild(rd.domElement);cam.position.set(c0[0],c0[1],c0[2]);cam.lookAt(0,0,0);sc.add(new THREE.AmbientLight(0x6670aa,.8));const L=new THREE.PointLight(0xffffff,1.5);L.position.set(0,6,8);sc.add(L);addEventListener('resize',()=>{const w=box.clientWidth,h=box.clientHeight;if(w&&h){rd.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix()}});return{sc,cam,rd}}
 function earth3d(){const box=document.querySelector('.earth');if(!box||!gl3())return;box.style.cssText+=';background:none;box-shadow:none;animation:none;border-radius:0';const{sc,cam,rd}=scene3(box,[0,0,3.2]);const e=new THREE.Mesh(new THREE.SphereGeometry(1,48,32),new THREE.MeshStandardMaterial({map:tex3('#1b6fe0','#3ddc84',2),roughness:.8})),cl=new THREE.Mesh(new THREE.SphereGeometry(1.03,32,24),new THREE.MeshStandardMaterial({color:0xffffff,transparent:true,opacity:.18}));sc.add(e);sc.add(cl);(function f(){if(!box.isConnected){rd.dispose();return}e.rotation.y+=.004;cl.rotation.y+=.006;rd.render(sc,cam);raf=requestAnimationFrame(f)})()}
 /* ===== Phase 2: 3D Planet Explorer + Moon Rover (Three.js r128) ===== */
-const LQ=innerWidth<700||(navigator.hardwareConcurrency||8)<=4,DPX=Math.min((typeof devicePixelRatio!=="undefined"&&devicePixelRatio)||1,LQ?1.5:2);
+const LQ=innerWidth<700||((typeof navigator!=="undefined"&&navigator.hardwareConcurrency)||8)<=4,DPX=Math.min((typeof devicePixelRatio!=="undefined"&&devicePixelRatio)||1,LQ?1.5:2);
 function FSE(id){const e=$(id),d=document;try{if(d.fullscreenElement||d.webkitFullscreenElement)(d.exitFullscreen||d.webkitExitFullscreen).call(d);else{const f=e.requestFullscreen||e.webkitRequestFullscreen;if(f)f.call(e);else toast('Full screen is not supported here.')}}catch(x){}}
 function mk3(box,fov){const rd=new THREE.WebGLRenderer({antialias:!LQ,powerPreference:'high-performance'});rd.setPixelRatio(DPX);rd.outputEncoding=THREE.sRGBEncoding;rd.shadowMap.enabled=!LQ;rd.shadowMap.type=THREE.PCFSoftShadowMap;const cam=new THREE.PerspectiveCamera(fov,1,.1,900),sc=new THREE.Scene();box.insertBefore(rd.domElement,box.firstChild);const rz=()=>{const w=box.clientWidth,h=box.clientHeight;if(w&&h){rd.setSize(w,h);cam.aspect=w/h;cam.fov=w<h?fov+18:fov;cam.updateProjectionMatrix()}};const ro=window.ResizeObserver?new ResizeObserver(rz):null;if(ro)ro.observe(box);rz();return{rd,cam,sc,end(){if(ro)ro.disconnect();rd.dispose();rd.domElement.remove()}}}
 function loop3(box,fn,end){let t0=performance.now();(function f(){if(!box.isConnected){end();return}const t=performance.now(),dt=Math.min(.05,(t-t0)/1000);t0=t;fn(dt,t/1000);raf=requestAnimationFrame(f)})()}

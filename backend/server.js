@@ -23,7 +23,7 @@ const GEMINI_KEY = E.GEMINI_API_KEY || '';
 const GEMINI_MODEL = E.GEMINI_MODEL || 'gemini-2.0-flash';
 const GEMINI_BASE = E.GEMINI_BASE || 'https://generativelanguage.googleapis.com';
 const ORIGIN = E.CORS_ORIGIN || '*';
-const DATA_FILE = E.DATA_FILE || path.join(__dir, 'data.json');
+const DATA_FILE = E.DATA_FILE || (process.env.VERCEL ? path.join('/tmp', 'data.json') : path.join(__dir, 'data.json'));
 const MISSIONS = ['zero', 'rover', 'rocket', 'planets', 'outpost', 'survive', 'nav', 'radio'];
 const MAX_XP_PER_MISSION = 150; // 100 + 50 daily bonus
 
@@ -76,6 +76,10 @@ const send = (res, code, obj) => {
   res.end(JSON.stringify(obj));
 };
 function body(req, max = 10000) {
+  if (req.body && typeof req.body === 'object') return Promise.resolve(req.body);
+  if (typeof req.body === 'string') {
+    try { return Promise.resolve(JSON.parse(req.body)); } catch { return Promise.reject(Object.assign(new Error('bad json'), { code: 400 })); }
+  }
   return new Promise((ok, bad) => {
     let s = '', over = false;
     req.on('data', d => { if (over) return; s += d; if (s.length > max) { over = true; s = ''; bad(Object.assign(new Error('too large'), { code: 413 })); } });
@@ -121,8 +125,9 @@ function serveStatic(req, res) {
 }
 
 /* ---------- routes ---------- */
-const server = http.createServer(async (req, res) => {
-  const u = new URL(req.url, 'http://x'), ip = req.socket.remoteAddress || '?';
+export async function handleRequest(req, res) {
+  const rawPath = req.headers?.['x-matched-path'] || req.url || '/';
+  const u = new URL(rawPath.startsWith('/') ? rawPath : '/' + rawPath, 'http://x'), ip = req.socket?.remoteAddress || req.headers?.['x-forwarded-for'] || '?';
   if (req.method === 'OPTIONS') return send(res, 204, {});
   if (!u.pathname.startsWith('/api/')) return req.method === 'GET' ? serveStatic(req, res) : send(res, 405, { error: 'method not allowed' });
   try {
@@ -155,10 +160,22 @@ const server = http.createServer(async (req, res) => {
       }
     }
     if (route === 'GET /api/nasa/mars') {
-      const items = await nasaImages('curiosity rover mars surface');
-      const off = Math.floor(Date.now() / 864e5) % Math.max(1, items.length - 4);
-      const photos = items.slice(off, off + 4).map(i => { const n = nasaItem(i); return { img: n.url, date: n.date, camera: n.title.slice(0, 60) }; });
-      return send(res, 200, { rover: 'Curiosity', photos, credit: 'NASA Image Library' });
+      try {
+        const m = await nasa('/mars-photos/api/v1/rovers/curiosity/latest_photos');
+        const list = (m && Array.isArray(m.latest_photos) ? m.latest_photos : []).filter(p => p.img_src && !/^javascript:/i.test(p.img_src));
+        const photos = list.slice(0, 4).map(p => ({
+          img: httpsUrl(String(p.img_src).replace(/^http:/, 'https:')),
+          date: String(p.earth_date || ''),
+          camera: String(p.camera?.full_name || 'Curiosity').slice(0, 60)
+        })).filter(p => p.img);
+        if (!photos.length) throw new Error('no photos');
+        return send(res, 200, { rover: 'Curiosity', photos, credit: 'NASA Mars Rover Photos' });
+      } catch {
+        const items = await nasaImages('curiosity rover mars surface');
+        const off = Math.floor(Date.now() / 864e5) % Math.max(1, items.length - 4);
+        const photos = items.slice(off, off + 4).map(i => { const n = nasaItem(i); return { img: n.url, date: n.date, camera: n.title.slice(0, 60) }; });
+        return send(res, 200, { rover: 'Curiosity', photos, credit: 'NASA Image Library' });
+      }
     }
     if (route === 'GET /api/gallery') {
       const dir = path.join(ROOT, 'public', 'gallery');
@@ -198,5 +215,10 @@ const server = http.createServer(async (req, res) => {
     console.error(e.message);
     return send(res, 502, { error: 'upstream unavailable' });
   }
-});
-server.listen(PORT, () => console.log(`SPACEBUDDY backend on http://localhost:${PORT} (AI ${GEMINI_KEY ? 'on' : 'off - local fallback'}, NASA key ${NASA_KEY === 'DEMO_KEY' ? 'DEMO_KEY' : 'set'})`));
+}
+const server = http.createServer(handleRequest);
+if (!process.env.VERCEL) {
+  server.listen(PORT, () => console.log(`SPACEBUDDY backend on http://localhost:${PORT} (AI ${GEMINI_KEY ? 'on' : 'off - local fallback'}, NASA key ${NASA_KEY === 'DEMO_KEY' ? 'DEMO_KEY' : 'set'})`));
+}
+export default handleRequest;
+export { server };

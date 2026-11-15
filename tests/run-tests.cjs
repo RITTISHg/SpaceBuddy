@@ -8,6 +8,7 @@ Object.assign(global, {
   innerWidth: 800, innerHeight: 600, addEventListener() {}, matchMedia: () => ({ matches: true }),
   requestAnimationFrame: () => 0, cancelAnimationFrame() {}, confirm: () => true,
   localStorage: { getItem: () => null, setItem() {} },
+  navigator: { hardwareConcurrency: 8 },
 });
 js += `;
 const results = runTests().split("\\n");
